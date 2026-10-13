@@ -1,0 +1,6 @@
+# repo ignore
+
+
+# user custom
+.agents/
+tasks/
