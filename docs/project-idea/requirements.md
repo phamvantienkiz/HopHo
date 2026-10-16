@@ -3,6 +3,7 @@
 > "Để AI họp hộ bạn."
 > Nguồn: [idea.md](./idea.md) + phiên brainstorm (grill-me) ngày 2026-10-13.
 > Trạng thái: **Draft v1** — chờ review.
+> Sau khi tách tài liệu theo 3 tầng, nguồn sự thật hiện hành nằm ở `docs/business/`, `docs/architecture/`, `docs/implementation/` (xem [architecture/README.md](../architecture/README.md)). Tài liệu này là đầu vào ban đầu.
 
 ---
 
@@ -76,7 +77,7 @@ flowchart LR
 | FR-AUD-04 | User chọn thiết bị mic/loopback; có màn hình test thiết bị (VU meter).                                      |
 | FR-AUD-05 | Audio được ghi xuống đĩa theo từng đoạn (chunk) liên tục, crash không làm mất phần đã ghi.                  |
 
-### 3.2 Luồng bắt đầu cuộc họp (FR-START)
+### 3.2 Luồng bắt đầu cuộc họp (FR-START-01)
 
 Trước mỗi phiên, app **hỏi user** (có thể lưu thành mặc định):
 
@@ -141,6 +142,7 @@ Trước mỗi phiên, app **hỏi user** (có thể lưu thành mặc định):
 | FR-LLM-05 | Glossary được nạp vào prompt để sửa chính tả thuật ngữ/tên riêng.                                                                           |
 | FR-LLM-06 | Export **Markdown / DOCX / PDF** và copy vào clipboard.                                                                                     |
 | FR-LLM-07 | User **upload mẫu biên bản** (DOCX/MD/PDF). App trích cấu trúc mẫu làm khung, LLM điền nội dung, export DOCX/MD. Template "Biên bản cuộc họp" có sẵn chỉ là mẫu mặc định chung. |
+| FR-LLM-08 | **Nhà cung cấp LLM**: hỗ trợ 3 nhóm Local (llama.cpp nhúng/Ollama), Cloud OpenAI-compatible, Agent CLI; chọn riêng cho từng tác vụ trong Settings (chi tiết bên dưới). |
 
 **LLM Providers** (chọn trong Settings, có thể đặt riêng cho từng tác vụ):
 
