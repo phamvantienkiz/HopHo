@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HopHo (Họp Hộ) — Trang Chủ Bàn Điều Khiển AI Meeting Assistant</title>
+  <style>
+    /* ==========================================================================
+       1. TOKEN ARCHITECTURE (3-LAYER TOKENS)
+       Trích xuất từ docs/architecture/14-design-language.md & soft-clean-cards.md
+       ========================================================================== */
+    :root {
+      /* Surface Tokens - Light Mode (Trắng trên nền xám ấm nhẹ) */
+      --bg-page: #F5F5F7;
+      --bg-card: #FFFFFF;
+      --bg-card-elevated: #FFFFFF;
+      --bg-subtle: #F4F4F6;
+      --bg-subtle-hover: #ECECEF;
+
+      /* Border Tokens - Light Mode */
+      --border-hairline: #EFEFF2;
+      --border-card: #E9E9EE;
+      --border-focus: #1F5FFF;
+
+      /* Text Tokens - Light Mode (Đạt chuẩn WCAG AA >= 4.5:1) */
+      --text-primary: #0B0B0F;
+      --text-secondary: #6B6B76;
+      --text-tertiary: #7C7C88;
+
+      /* Primary Action (Ink) - Light Mode */
+      --ink: #111114;
+      --ink-hover: #26262B;
+      --text-on-ink: #FFFFFF;
+
+      /* Data & Status Tokens - Light Mode */
+      --data-1: #1F5FFF; /* Xanh dương: Quy trình, Models, Phím chọn */
+      --data-2: #B13BF0; /* Tím: Audio WAV, Trợ lý AI */
+      --data-3: #FF8A1F; /* Cam: Cảnh báo, Bookmark, DB SQLite */
+      --data-4: #1FA63A; /* Xanh lá: CUDA sẵn sàng, Âm lượng chuẩn */
+      --data-alert: #E5483D; /* Đỏ: Nhịp thở ghi âm, Quá ngưỡng */
+
+      /* Status Tints */
+      --status-info-bg: #EBF1FF;
+      --status-success-bg: #E8F8EC;
+      --status-warning-bg: #FFF3E6;
+      --status-danger-bg: #FDECEB;
+
+      /* Speaker Pastel Tokens - Light Mode */
+      --speaker-1-bg: #FFD9E8; --speaker-1-text: #7A1C44;
+      --speaker-2-bg: #D9E8FF; --speaker-2-text: #143E8A;
+      --speaker-3-bg: #FFF1C9; --speaker-3-text: #73510A;
+
+      /* Shadows - Light Mode */
+      --shadow-card: 0 1px 2px rgba(15, 15, 20, 0.04), 0 8px 24px -4px rgba(15, 15, 20, 0.06);
+      --shadow-card-hover: 0 2px 4px rgba(15, 15, 20, 0.06), 0 16px 32px -6px rgba(15, 15, 20, 0.10);
+      --shadow-pop: 0 4px 12px rgba(15, 15, 20, 0.12);
+
+      /* Radii */
+      --radius-xl: 28px;
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --radius-xs: 4px;
+      --radius-full: 9999px;
+
+      /* Floating Overlay Glass */
+      --overlay-bg: rgba(18, 18, 21, 0.82);
+      --overlay-border: rgba(255, 255, 255, 0.14);
+      --overlay-text-vi: #FFE082;
+
+      /* Typography Stack */
+      --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Geist Mono', monospace;
+    }
+
+    /* Dark Mode (Đen sâu & Than chì phân tầng) */
+    html.dark {
+      --bg-page: #09090B;
+      --bg-card: #121215;
+      --bg-card-elevated: #17171C;
+      --bg-subtle: #1A1A1F;
+      --bg-subtle-hover: #24242B;
+
+      --border-hairline: #1F1F26;
+      --border-card: #22222A;
+      --border-focus: #3B7BFF;
+
+      --text-primary: #F5F5F7;
+      --text-secondary: #A0A0AB;
+      --text-tertiary: #6E6E7A;
+
+      --ink: #F5F5F7;
+      --ink-hover: #E2E2E8;
+      --text-on-ink: #0B0B0F;
+
+      --data-1: #3B7BFF;
+      --data-2: #C45FF5;
+      --data-3: #FF9E42;
+      --data-4: #28C247;
+      --data-alert: #FF5A4F;
+
+      --status-info-bg: rgba(59, 123, 255, 0.14);
+      --status-success-bg: rgba(40, 194, 71, 0.14);
+      --status-warning-bg: rgba(255, 158, 66, 0.14);
+      --status-danger-bg: rgba(255, 90, 79, 0.14);
+
+      --speaker-1-bg: rgba(255, 140, 186, 0.16); --speaker-1-text: #FF9EC4;
+      --speaker-2-bg: rgba(110, 168, 255, 0.16); --speaker-2-text: #8AB8FF;
+      --speaker-3-bg: rgba(255, 214, 102, 0.16); --speaker-3-text: #FFE082;
+
+      --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.40), 0 12px 28px -6px rgba(0, 0, 0, 0.55);
+      --shadow-card-hover: 0 4px 8px rgba(0, 0, 0, 0.50), 0 18px 36px -6px rgba(0, 0, 0, 0.70);
+      --shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.65);
+
+      --overlay-bg: rgba(12, 12, 15, 0.88);
+      --overlay-border: rgba(255, 255, 255, 0.16);
+    }
+
+    /* ==========================================================================
+       2. BASE & UTILITIES
+       ========================================================================== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.45;
+      font-size: 14px;
+      transition: background-color 160ms ease, color 160ms ease;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1, "cv11" 1;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+    }
+
+    /* ==========================================================================
+       3. TOP TOOLBAR (APP HEADER & CONTROLLER)
+       ========================================================================== */
+    .app-header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-card);
+      padding: 12px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      transition: background-color 160ms ease, border-color 160ms ease;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: var(--ink);
+      color: var(--text-on-ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .brand-name {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .brand-badge {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      background: var(--status-info-bg);
+      color: var(--data-1);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Segmented Control */
+    .segmented-control {
+      display: inline-flex;
+      background: var(--bg-subtle);
+      padding: 3px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-hairline);
+      gap: 2px;
+    }
+
+    .segmented-item {
+      border: none;
+      background: transparent;
+      padding: 6px 14px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 180ms cubic-bezier(0.32, 0.72, 0, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .segmented-item:hover:not(.active) {
+      color: var(--text-primary);
+    }
+
+    .segmented-item.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-pop);
+      font-weight: 600;
+    }
+
+    /* ==========================================================================
+       4. HOMEPAGE GRID & SIDEBAR LAYOUT
+       ========================================================================== */
+    .homepage-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      flex: 1;
+      max-width: 1540px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px 28px;
+      gap: 28px;
+    }
+
+    @media (max-width: 1024px) {
+      .homepage-layout {
+        grid-template-columns: 1fr;
+        padding: 16px;
+        gap: 16px;
+      }
+      .sidebar {
+        display: none !important;
+      }
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      list-style: none;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      font-weight: 500;
+      font-size: 14px;
+      transition: background 120ms ease, color 120ms ease;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+    }
+
+    .nav-link:hover {
+      background: var(--bg-subtle-hover);
+      color: var(--text-primary);
+    }
+
+    .nav-link.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-card);
+      font-weight: 600;
+    }
+
+    /* Hardware Status Mini Card in Sidebar */
+    .hardware-mini-card {
+      margin-top: auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .hardware-mini-card .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    /* Main Dashboard Canvas */
+    .dashboard-canvas {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .page-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .page-title-row h1 {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .page-title-row p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* Dashboard 2-Column Grid */
+    .bento-grid {
+      display: grid;
+      grid-template-columns: 7fr 5fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 1240px) {
+      .bento-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ==========================================================================
+       5. SOFT CLEAN CARDS & DOMAIN COMPONENTS
+       ========================================================================== */
+    .soft-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-xl);
+      padding: 24px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      transition: box-shadow 180ms ease, border-color 160ms ease, background-color 160ms ease;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text-primary);
+    }
+
+    .card-subtle-well {
+      background: var(--bg-subtle);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: background-color 160ms ease;
+    }
+
+    /* Buttons */
+    .btn {
+      font-family: inherit;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-weight: 500;
+      transition: all 120ms ease-out;
+      border-radius: var(--radius-md);
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-hero-circle {
+      width: 54px;
+      height: 54px;
+      border-radius: var(--radius-full);
+      background: var(--ink);
+      color: var(--text-on-ink);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    }
+
+    .btn-hero-circle.recording {
+      background: var(--data-alert) !important;
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(229, 72, 61, 0.45); }
+      70% { box-shadow: 0 0 0 14px rgba(229, 72, 61, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(229, 72, 61, 0); }
+    }
+
+    .btn-icon-circle {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-full);
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+    }
+
+    .btn-icon-circle:hover {
+      background: var(--bg-subtle-hover);
+    }
+
+    .btn-primary-ink {
+      height: 40px;
+      padding: 0 20px;
+      border-radius: var(--radius-full);
+      background: var(--ink);
+      color: var(--text-on-ink);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .btn-primary-ink:hover {
+      background: var(--ink-hover);
+    }
+
+    .btn-subtle {
+      height: 38px;
+      padding: 0 16px;
+      border-radius: var(--radius-md);
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+
+    .btn-subtle:hover {
+      background: var(--bg-subtle-hover);
+    }
+
+    /* Hero Timer */
+    .hero-timer-display {
+      font-size: 52px;
+      font-weight: 400;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      color: var(--text-primary);
+      margin: 8px 0;
+    }
+
+    /* Dual VU Meter */
+    .vu-meter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .vu-track-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .vu-track-outer {
+      height: 8px;
+      background: var(--bg-page);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .vu-track-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--data-1);
+      border-radius: var(--radius-full);
+      transition: width 60ms linear, background-color 100ms ease;
+    }
+
+    .vu-track-fill.optimal {
+      background: var(--data-4);
+    }
+
+    .vu-track-fill.clipping {
+      background: var(--data-alert);
+    }
+
+    /* Status Pill Badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-badge.live {
+      background: var(--status-danger-bg);
+      color: var(--data-alert);
+    }
+
+    .status-badge.live::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--data-alert);
+      animation: blink 1.2s infinite ease-in-out;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .status-badge.ready {
+      background: var(--status-success-bg);
+      color: var(--data-4);
+    }
+
+    /* Storage Stacked Bar Breakdown Component */
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    .metric-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .metric-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .stacked-bar {
+      height: 18px;
+      background: var(--bg-subtle);
+      border-radius: 6px;
+      display: flex;
+      gap: 2px;
+      overflow: hidden;
+      padding: 1px;
+    }
+
+    .bar-segment {
+      height: 100%;
+      border-radius: var(--radius-xs);
+      transition: width 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .legend-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      list-style: none;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    .legend-bullet {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    /* Live Transcript Rows */
+    .transcript-stream {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 380px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .transcript-row {
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      background: transparent;
+      transition: background 120ms ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-left: 2px solid transparent;
+    }
+
+    .transcript-row:hover {
+      background: var(--bg-subtle);
+    }
+
+    .transcript-row.active {
+      background: var(--status-info-bg);
+      border-left-color: var(--data-1);
+    }
+
+    .transcript-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .speaker-pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .timestamp {
+      color: var(--text-tertiary);
+    }
+
+    .transcript-text {
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-primary);
+    }
+
+    .transcript-vi {
+      font-size: 13px;
+      color: var(--text-secondary);
+      border-left: 2px solid var(--border-hairline);
+      padding-left: 8px;
+      margin-top: 2px;
+    }
+
+    /* Floating Subtitle Overlay Simulation */
+    .overlay-window-sim {
+      position: fixed;
+      bottom: 24px;
+      right: 28px;
+      width: 520px;
+      background: var(--overlay-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--overlay-border);
+      border-radius: var(--radius-lg);
+      padding: 14px 18px;
+      color: #FFFFFF;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.45);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: opacity 200ms ease, transform 200ms ease;
+    }
+
+    .overlay-window-sim.minimized {
+      transform: translateY(120%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .overlay-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #A0A0AB;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 6px;
+    }
+
+    .overlay-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+
+    .overlay-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--data-alert);
+      animation: blink 1.2s infinite;
+    }
+
+    .overlay-line-orig {
+      font-size: 13px;
+      color: #E2E2E8;
+    }
+
+    .overlay-line-orig .partial {
+      color: #9A9AA5;
+      font-style: italic;
+    }
+
+    .overlay-line-vi {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--overlay-text-vi);
+      line-height: 1.35;
+    }
+
+    /* Outbound Consent Modal Simulation */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 9, 11, 0.5);
+      backdrop-filter: blur(6px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease;
+    }
+
+    .modal-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: var(--bg-card-elevated);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-xl);
+      padding: 24px;
+      width: 460px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transform: scale(0.96);
+      transition: transform 160ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .modal-backdrop.open .modal-card {
+      transform: scale(1);
+    }
+
+    /* Helper SVG Icon */
+    .icon {
+      width: 18px;
+      height: 18px;
+      stroke-width: 1.75;
+      stroke: currentColor;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       APP TOP HEADER & PROTOTYPE CONTROLS
+       ========================================================================== -->
+  <header class="app-header">
+    <div class="brand-group">
+      <div class="brand-logo">H</div>
+      <div>
+        <span class="brand-name">Họp Hộ</span>
+        <span style="font-size:12px;color:var(--text-tertiary);margin-left:6px;">(HopHo AI Assistant)</span>
+      </div>
+      <span class="brand-badge">Trang Chủ Prototype</span>
+    </div>
+
+    <div class="header-actions">
+      <!-- Theme Switcher (Light / Dark) -->
+      <div class="segmented-control" role="group" aria-label="Chế độ giao diện">
+        <button class="segmented-item active" id="btnThemeLight" onclick="setTheme('light')">
+          <svg class="icon" style="width:14px;height:14px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+          Sáng (Light)
+        </button>
+        <button class="segmented-item" id="btnThemeDark" onclick="setTheme('dark')">
+          <svg class="icon" style="width:14px;height:14px" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          Tối (Dark)
+        </button>
+      </div>
+
+      <button class="btn btn-subtle" onclick="toggleOverlaySim()">
+        <svg class="icon" viewBox="0 0 24 24"><rect width="18" height="12" x="3" y="6" rx="2"/><path d="M7 14h10"/><path d="M7 10h6"/></svg>
+        <span>Hiện Subtitle Overlay</span>
+      </button>
+
+      <button class="btn btn-subtle" onclick="openConsentModal()">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Consent Gate (Bảo Mật)</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ==========================================================================
+       HOMEPAGE WORKSPACE
+       ========================================================================== -->
+  <div class="homepage-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <ul class="nav-list">
+        <li>
+          <button class="nav-link active">
+            <svg class="icon" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Bàn Điều Khiển
+          </button>
+        </li>
+        <li>
+          <button class="nav-link">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+            Lịch Sử Cuộc Họp
+          </button>
+        </li>
+        <li>
+          <button class="nav-link">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            Gói Model AI
+          </button>
+        </li>
+        <li>
+          <button class="nav-link">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            Cài Đặt Hệ Thống
+          </button>
+        </li>
+      </ul>
+
+      <!-- Hardware Mini Status Card -->
+      <div class="hardware-mini-card">
+        <div class="row">
+          <span style="color:var(--text-secondary);font-weight:500;">Bộ Xử Lý AI</span>
+          <span class="status-badge ready" style="padding:2px 8px;font-size:11px;">NVIDIA CUDA</span>
+        </div>
+        <div class="row">
+          <span style="color:var(--text-secondary);font-weight:500;">Ổ Đĩa Còn Trống</span>
+          <span class="tabular-nums" style="font-weight:600;">42.1 GB</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Canvas -->
+    <main class="dashboard-canvas">
+      <!-- Title Bar with Meeting Mode Switcher -->
+      <div class="page-title-row">
+        <div>
+          <h1>Họp Kế Hoạch Sản Phẩm Q4</h1>
+          <p>Nguồn âm thanh: Microphone Cục Bộ & Google Meet Loopback</p>
+        </div>
+
+        <div class="segmented-control" role="group" aria-label="Chế độ cuộc họp">
+          <button class="segmented-item active" id="modeLive" onclick="setMeetingMode('live')">
+            <svg class="icon" style="width:14px;height:14px;color:var(--data-1)" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Trợ Lý Trực Tiếp
+          </button>
+          <button class="segmented-item" id="modeRecordOnly" onclick="setMeetingMode('record')">
+            <svg class="icon" style="width:14px;height:14px;color:var(--data-3)" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+            Ghi Âm Hậu Kỳ
+          </button>
+        </div>
+      </div>
+
+      <!-- Bento Cards Grid: Recording Hero + Audio Level Strip -->
+      <div class="bento-grid">
+        <!-- 1. Recording Hero Card (Soft Clean Cards Style) -->
+        <section class="soft-card">
+          <div class="card-header">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="card-title">Bộ Điều Khiển Thu Âm</span>
+              <span class="status-badge live" id="recBadge">Đang thu trực tiếp</span>
+            </div>
+            <button class="btn btn-icon-circle" title="Đánh dấu mốc Bookmark (Ctrl+B)" onclick="addBookmark()">
+              <svg class="icon" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+            </button>
+          </div>
+
+          <div>
+            <div class="hero-timer-display tabular-nums" id="timerDisplay">00:14:28</div>
+            <p style="color:var(--text-tertiary);font-size:13px;">Ghi âm định dạng WAV 16kHz Mono • Tự động ngắt đoạn lưu an toàn</p>
+          </div>
+
+          <!-- Hero Button Cluster -->
+          <div style="display:flex;align-items:center;gap:16px;margin-top:4px;">
+            <button class="btn btn-icon-circle" id="btnPause" title="Tạm dừng / Tiếp tục" onclick="togglePause()">
+              <svg class="icon" id="iconPause" viewBox="0 0 24 24"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>
+            </button>
+
+            <button class="btn btn-hero-circle recording" id="btnRecordToggle" title="Bấm để Dừng / Bắt đầu" onclick="toggleRecording()">
+              <svg class="icon" id="iconRecord" style="width:24px;height:24px;fill:currentColor" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="2"/></svg>
+            </button>
+
+            <button class="btn btn-subtle" onclick="triggerBatchSim()">
+              <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              <span>Thử Giả Lập Batch</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- 2. Audio Level Strip & VU Meter Card -->
+        <section class="soft-card">
+          <div class="card-header">
+            <span class="card-title">Tín Hiệu Âm Thanh</span>
+            <span class="status-badge ready">2 Kênh Khớp Nhau</span>
+          </div>
+
+          <div class="card-subtle-well">
+            <div class="vu-meter-group">
+              <div>
+                <div class="vu-track-label">
+                  <span>Microphone Cục Bộ (Bạn nói)</span>
+                  <span class="tabular-nums" id="micDbVal">-14 dBFS</span>
+                </div>
+                <div class="vu-track-outer">
+                  <div class="vu-track-fill optimal" id="micVuFill" style="width: 58%;"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="vu-track-label">
+                  <span>Âm Thanh Hệ Thống (Zoom / Meet)</span>
+                  <span class="tabular-nums" id="sysDbVal">-18 dBFS</span>
+                </div>
+                <div class="vu-track-outer">
+                  <div class="vu-track-fill" id="sysVuFill" style="width: 44%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text-secondary);">
+            <span>Ngôn ngữ nguồn: <strong>Tiếng Anh (EN)</strong></span>
+            <span>Dịch trực tiếp: <strong>Tiếng Việt (VI)</strong></span>
+          </div>
+        </section>
+      </div>
+
+      <!-- 3. Live Transcript Stream Card -->
+      <section class="soft-card">
+        <div class="card-header">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span class="card-title">Luồng Phụ Đề & Gỡ Băng Thời Gian Thực</span>
+            <span style="font-size:12px;color:var(--text-tertiary);">(Độ trễ &lt; 300ms)</span>
+          </div>
+          <button class="btn btn-subtle" onclick="clearStream()">Xóa màn hình</button>
+        </div>
+
+        <div class="transcript-stream" id="transcriptStream">
+          <!-- Row 1 -->
+          <div class="transcript-row">
+            <div class="transcript-meta">
+              <span class="speaker-pill" style="background:var(--speaker-1-bg);color:var(--speaker-1-text);">Anh Minh (PM)</span>
+              <span class="timestamp tabular-nums">00:13:42</span>
+            </div>
+            <div class="transcript-text">Welcome everyone. Let's review the product roadmap and the target release date for the AI assistant.</div>
+            <div class="transcript-vi">Chào mừng mọi người. Hãy cùng xem lại lộ trình sản phẩm và ngày phát hành mục tiêu cho trợ lý AI.</div>
+          </div>
+
+          <!-- Row 2 -->
+          <div class="transcript-row">
+            <div class="transcript-meta">
+              <span class="speaker-pill" style="background:var(--speaker-2-bg);color:var(--speaker-2-text);">Linh (Tech Lead)</span>
+              <span class="timestamp tabular-nums">00:14:05</span>
+            </div>
+            <div class="transcript-text">Our local Whisper STT pipeline is currently hitting 145 milliseconds latency with 95% accuracy.</div>
+            <div class="transcript-vi">Hệ thống Whisper STT cục bộ hiện đạt độ trễ 145 mili-giây với độ chính xác 95%.</div>
+          </div>
+
+          <!-- Row 3 (Active) -->
+          <div class="transcript-row active">
+            <div class="transcript-meta">
+              <span class="speaker-pill" style="background:var(--speaker-1-bg);color:var(--speaker-1-text);">Anh Minh (PM)</span>
+              <span class="timestamp tabular-nums">00:14:26</span>
+              <span style="font-size:11px;color:var(--data-1);font-weight:600;">● Đang phát</span>
+            </div>
+            <div class="transcript-text">That is impressive. We will commit to Release 1 MVP delivery by the end of this month.</div>
+            <div class="transcript-vi">Thật ấn tượng. Chúng ta sẽ cam kết bàn giao bản MVP Release 1 vào cuối tháng này.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Storage Breakdown Card (Soft Clean Cards Exact Match) -->
+      <section class="soft-card">
+        <div class="card-header">
+          <span class="card-title">Dung Lượng Lưu Trữ Cục Bộ</span>
+          <button class="btn btn-subtle" onclick="simulateCleanup()">Dọn File WAV Cũ</button>
+        </div>
+
+        <!-- 3-Metric Row -->
+        <div class="metric-row">
+          <div class="metric-item">
+            <span class="metric-label">Tổng Đã Dùng</span>
+            <span class="metric-value tabular-nums" id="statUsed">8.4 GB</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Ổ Đĩa Còn Trống</span>
+            <span class="metric-value tabular-nums" id="statFree">42.1 GB</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Cuộc Họp Lưu Trữ</span>
+            <span class="metric-value tabular-nums">24 phiên</span>
+          </div>
+        </div>
+
+        <!-- Stacked Bar (4 data tokens with 2px gap & 4px radius) -->
+        <div class="stacked-bar">
+          <div class="bar-segment" id="barModels" style="width: 57%; background: var(--data-1);" title="Mô hình AI: 4.8 GB"></div>
+          <div class="bar-segment" id="barAudio" style="width: 37%; background: var(--data-2);" title="File âm thanh WAV: 3.1 GB"></div>
+          <div class="bar-segment" style="width: 5%; background: var(--data-3);" title="Database SQLite: 0.4 GB"></div>
+          <div class="bar-segment" style="width: 1%; background: var(--data-4);" title="File xuất: 0.1 GB"></div>
+        </div>
+
+        <!-- Legend List -->
+        <ul class="legend-list">
+          <li class="legend-item">
+            <div><span class="legend-bullet" style="background:var(--data-1)"></span><span>Mô hình AI (Whisper & Local LLM)</span></div>
+            <span class="tabular-nums" style="font-weight:600;">4.8 GB <span style="color:var(--text-tertiary);font-weight:400;">(57%)</span></span>
+          </li>
+          <li class="legend-item">
+            <div><span class="legend-bullet" style="background:var(--data-2)"></span><span id="audioLegendText">Bản ghi âm gốc (.WAV)</span></div>
+            <span class="tabular-nums" style="font-weight:600;" id="audioLegendSize">3.1 GB <span style="color:var(--text-tertiary);font-weight:400;">(37%)</span></span>
+          </li>
+          <li class="legend-item">
+            <div><span class="legend-bullet" style="background:var(--data-3)"></span><span>Cơ sở dữ liệu & Chỉ mục tìm kiếm FTS5</span></div>
+            <span class="tabular-nums" style="font-weight:600;">0.4 GB <span style="color:var(--text-tertiary);font-weight:400;">(5%)</span></span>
+          </li>
+        </ul>
+      </section>
+    </main>
+  </div>
+
+  <!-- ==========================================================================
+       SIMULATED FLOATING SUBTITLE OVERLAY WINDOW
+       ========================================================================== -->
+  <aside class="overlay-window-sim" id="overlaySim" aria-live="polite">
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <span class="overlay-dot"></span>
+        <span>HopHo Subtitle • Always-On-Top</span>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-icon-circle" style="width:24px;height:24px;background:rgba(255,255,255,0.1);color:#fff;" onclick="toggleOverlaySim()" title="Ẩn Overlay">✕</button>
+      </div>
+    </div>
+    <div class="overlay-line-orig">
+      <span>We will commit to Release 1 MVP delivery... </span>
+      <span class="partial">by the end of this month.</span>
+    </div>
+    <div class="overlay-line-vi">
+      Chúng ta sẽ cam kết bàn giao bản MVP Release 1 vào cuối tháng này.
+    </div>
+  </aside>
+
+  <!-- ==========================================================================
+       SIMULATED OUTBOUND CONSENT GATE MODAL (FR-DATA-06)
+       ========================================================================== -->
+  <div class="modal-backdrop" id="consentModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;border-radius:var(--radius-full);background:var(--status-info-bg);color:var(--data-1);display:flex;align-items:center;justify-content:center;">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>
+          <h2 id="modalTitle" style="font-size:17px;font-weight:600;">Xác Nhận Bảo Mật Dữ Liệu</h2>
+          <p style="font-size:12px;color:var(--text-secondary);">Quyền riêng tư cục bộ (Privacy Invariant)</p>
+        </div>
+      </div>
+
+      <div class="card-subtle-well" style="font-size:13px;line-height:1.5;">
+        <p><strong>Cảnh báo:</strong> Bạn chuẩn bị kích hoạt tính năng tóm tắt qua <strong>Cloud LLM API</strong>.</p>
+        <p style="margin-top:6px;color:var(--text-secondary);">
+          • Chỉ gửi văn bản Transcript (Khoảng 2,400 từ).<br>
+          • <strong>Tuyệt đối KHÔNG</strong> tải file ghi âm gốc (.wav) lên mạng.
+        </p>
+      </div>
+
+      <div style="display:flex;gap:12px;justify-content:flex-end;">
+        <button class="btn btn-subtle" onclick="closeConsentModal()">Hủy & Dùng Local AI</button>
+        <button class="btn btn-primary-ink" onclick="confirmCloudConsent()">Đồng Ý & Tiếp Tục</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       PROTOTYPE INTERACTION SCRIPTS
+       ========================================================================== -->
+  <script>
+    let isRecording = true;
+    let isPaused = false;
+    let seconds = 868; // 00:14:28
+    let timerInterval = null;
+    let vuInterval = null;
+
+    // Format helper for tabular timer
+    function formatTime(s) {
+      const hrs = Math.floor(s / 3600).toString().padStart(2, '0');
+      const mins = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
+      const secs = (s % 60).toString().padStart(2, '0');
+      return `${hrs}:${mins}:${secs}`;
+    }
+
+    // Timer Loop
+    function startTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (isRecording && !isPaused) {
+          seconds++;
+          document.getElementById('timerDisplay').textContent = formatTime(seconds);
+        }
+      }, 1000);
+    }
+
+    // Audio VU Meter Simulation
+    function startVuSimulation() {
+      if (vuInterval) clearInterval(vuInterval);
+      vuInterval = setInterval(() => {
+        if (!isRecording || isPaused) {
+          document.getElementById('micVuFill').style.width = '4%';
+          document.getElementById('sysVuFill').style.width = '4%';
+          document.getElementById('micDbVal').textContent = '-inf dBFS';
+          document.getElementById('sysDbVal').textContent = '-inf dBFS';
+          return;
+        }
+
+        const micVal = Math.floor(35 + Math.random() * 45);
+        const sysVal = Math.floor(25 + Math.random() * 40);
+
+        const micFill = document.getElementById('micVuFill');
+        const sysFill = document.getElementById('sysVuFill');
+
+        micFill.style.width = micVal + '%';
+        sysFill.style.width = sysVal + '%';
+
+        if (micVal > 75) {
+          micFill.className = 'vu-track-fill clipping';
+          document.getElementById('micDbVal').textContent = '-1.2 dBFS (To)';
+        } else if (micVal > 40) {
+          micFill.className = 'vu-track-fill optimal';
+          document.getElementById('micDbVal').textContent = `-${Math.round(20 - micVal/5)} dBFS`;
+        } else {
+          micFill.className = 'vu-track-fill';
+          document.getElementById('micDbVal').textContent = `-${Math.round(40 - micVal/5)} dBFS`;
+        }
+
+        document.getElementById('sysDbVal').textContent = `-${Math.round(35 - sysVal/4)} dBFS`;
+      }, 100);
+    }
+
+    // Recording Toggle
+    function toggleRecording() {
+      isRecording = !isRecording;
+      const btn = document.getElementById('btnRecordToggle');
+      const badge = document.getElementById('recBadge');
+      const iconRecord = document.getElementById('iconRecord');
+
+      if (isRecording) {
+        btn.classList.add('recording');
+        btn.setAttribute('title', 'Dừng thu âm');
+        badge.className = 'status-badge live';
+        badge.textContent = 'Đang thu trực tiếp';
+        iconRecord.innerHTML = '<rect width="14" height="14" x="5" y="5" rx="2"/>';
+        isPaused = false;
+      } else {
+        btn.classList.remove('recording');
+        btn.setAttribute('title', 'Bắt đầu thu âm');
+        badge.className = 'status-badge ready';
+        badge.textContent = 'Đã dừng thu';
+        iconRecord.innerHTML = '<circle cx="12" cy="12" r="7"/>';
+      }
+    }
+
+    // Pause Toggle
+    function togglePause() {
+      if (!isRecording) return;
+      isPaused = !isPaused;
+      const btn = document.getElementById('btnPause');
+      const badge = document.getElementById('recBadge');
+
+      if (isPaused) {
+        btn.style.background = 'var(--status-warning-bg)';
+        badge.className = 'status-badge';
+        badge.style.background = 'var(--status-warning-bg)';
+        badge.style.color = 'var(--data-3)';
+        badge.textContent = 'Đang tạm dừng';
+      } else {
+        btn.style.background = 'var(--bg-subtle)';
+        badge.className = 'status-badge live';
+        badge.style.background = '';
+        badge.style.color = '';
+        badge.textContent = 'Đang thu trực tiếp';
+      }
+    }
+
+    // Bookmark Action
+    function addBookmark() {
+      const stream = document.getElementById('transcriptStream');
+      const bookmarkRow = document.createElement('div');
+      bookmarkRow.className = 'transcript-row';
+      bookmarkRow.style.background = 'var(--status-warning-bg)';
+      bookmarkRow.innerHTML = `
+        <div class="transcript-meta">
+          <span class="speaker-pill" style="background:var(--data-3);color:#fff;">★ Bookmark Đã Ghim</span>
+          <span class="timestamp tabular-nums">${formatTime(seconds)}</span>
+        </div>
+        <div class="transcript-text" style="font-weight:500;">Người dùng đánh dấu mốc quan trọng trong cuộc họp.</div>
+      `;
+      stream.appendChild(bookmarkRow);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    // Theme Switcher
+    function setTheme(mode) {
+      const html = document.documentElement;
+      const btnLight = document.getElementById('btnThemeLight');
+      const btnDark = document.getElementById('btnThemeDark');
+
+      if (mode === 'dark') {
+        html.classList.add('dark');
+        btnDark.classList.add('active');
+        btnLight.classList.remove('active');
+      } else {
+        html.classList.remove('dark');
+        btnLight.classList.add('active');
+        btnDark.classList.remove('active');
+      }
+    }
+
+    // Meeting Mode Switcher
+    function setMeetingMode(mode) {
+      const btnLive = document.getElementById('modeLive');
+      const btnRecord = document.getElementById('modeRecordOnly');
+      const overlay = document.getElementById('overlaySim');
+
+      if (mode === 'live') {
+        btnLive.classList.add('active');
+        btnRecord.classList.remove('active');
+        overlay.classList.remove('minimized');
+      } else {
+        btnRecord.classList.add('active');
+        btnLive.classList.remove('active');
+        overlay.classList.add('minimized');
+      }
+    }
+
+    // Toggle Floating Overlay
+    function toggleOverlaySim() {
+      const overlay = document.getElementById('overlaySim');
+      overlay.classList.toggle('minimized');
+    }
+
+    // Clear Stream
+    function clearStream() {
+      document.getElementById('transcriptStream').innerHTML = `
+        <div style="padding:24px;text-align:center;color:var(--text-tertiary);font-size:13px;">
+          Đã xóa màn hình phụ đề tạm thời. Phụ đề mới sẽ tiếp tục xuất hiện khi có giọng nói.
+        </div>
+      `;
+    }
+
+    // Simulate Cleanup
+    function simulateCleanup() {
+      const barAudio = document.getElementById('barAudio');
+      const barModels = document.getElementById('barModels');
+      const statUsed = document.getElementById('statUsed');
+      const statFree = document.getElementById('statFree');
+      const audioText = document.getElementById('audioLegendText');
+      const audioSize = document.getElementById('audioLegendSize');
+
+      barAudio.style.width = '6%';
+      barModels.style.width = '84%';
+      statUsed.textContent = '5.5 GB';
+      statFree.textContent = '45.0 GB';
+      audioText.textContent = 'Bản ghi âm (.WAV) — Đã dọn dẹp';
+      audioSize.innerHTML = '0.2 GB <span style="color:var(--text-tertiary);font-weight:400;">(3%)</span>';
+
+      alert('Đã dọn dẹp 2.9 GB file ghi âm .WAV cũ! Bản gỡ băng và biên bản tóm tắt vẫn được bảo tồn.');
+    }
+
+    // Simulate Batch Processing
+    function triggerBatchSim() {
+      let percent = 0;
+      const badge = document.getElementById('recBadge');
+      badge.className = 'status-badge';
+      badge.style.background = 'var(--status-info-bg)';
+      badge.style.color = 'var(--data-1)';
+
+      const interval = setInterval(() => {
+        percent += 20;
+        badge.textContent = `Đang xử lý Batch ${percent}%`;
+        if (percent >= 100) {
+          clearInterval(interval);
+          badge.className = 'status-badge live';
+          badge.style.background = '';
+          badge.style.color = '';
+          badge.textContent = 'Đang thu trực tiếp';
+        }
+      }, 400);
+    }
+
+    // Consent Modal Open/Close
+    function openConsentModal() {
+      document.getElementById('consentModal').classList.add('open');
+    }
+
+    function closeConsentModal() {
+      document.getElementById('consentModal').classList.remove('open');
+    }
+
+    function confirmCloudConsent() {
+      closeConsentModal();
+      alert('Đã cấp quyền gửi Transcript lên Cloud LLM API an toàn cho phiên họp này.');
+    }
+
+    // Keyboard support
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeConsentModal();
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        addBookmark();
+      }
+    });
+
+    // Initialize
+    startTimer();
+    startVuSimulation();
+  </script>
+</body>
+</html>
