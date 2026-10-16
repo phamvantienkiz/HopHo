@@ -3,6 +3,7 @@
 > Nguồn yêu cầu: [requirements.md](../project-idea/requirements.md)
 > Spike liên quan: [spike-stt-benchmark.md](./spike-stt-benchmark.md)
 > Trạng thái: **Approved v1** — 2026-10-13
+> Sau khi tách tài liệu theo 3 tầng, nguồn sự thật hiện hành nằm ở `docs/architecture/` và `docs/implementation/`. Tài liệu này là kế hoạch đầu vào ban đầu.
 
 ---
 
@@ -68,6 +69,7 @@ HopHo/
 ```
 
 > Cấu trúc này là đề xuất ban đầu. Tên/thư mục có thể điều chỉnh khi scaffold ở M1, nhưng ranh giới trách nhiệm (Rust: audio/storage/system; Python: AI) giữ nguyên.
+> Cấu trúc chính thức: [10-folder-structure.md](../architecture/10-folder-structure.md).
 
 ---
 
@@ -121,6 +123,8 @@ sequenceDiagram
 ---
 
 ## 5. Data model sơ bộ (SQLite)
+
+> Bản sơ bộ. Schema chính thức: [05-data-architecture.md](../architecture/05-data-architecture.md).
 
 | Bảng | Trường chính |
 |---|---|
